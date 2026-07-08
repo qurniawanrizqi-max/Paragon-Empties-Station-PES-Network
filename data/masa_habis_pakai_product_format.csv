@@ -1,0 +1,74 @@
+PRODUCT_FORM,MASA_HABIS_PAKAI_MEDIAN_BULAN,REFERENSI_DAN_LOGIKA_INDUSTRI
+FACIAL WASH,3.25,AAD: Anjuran cuci wajah 2x sehari untuk higienitas.
+LIP CREAM,5.00,Statista Consumer Insights: Siklus repurchasing makeup bibir harian.
+SUNSCREEN,1.25,"AAD: ""Two-Finger Rule"" untuk perlindungan UV wajah & leher efektif."
+MOISTURIZER,3.25,Dermatologi: Standar hidrasi kulit harian pagi dan malam.
+TWC,7.00,Kategori powder memiliki stabilitas tinggi dibanding liquid.
+DEODORANT,1.75,Pola konsumsi personal care harian masyarakat urban.
+FOUNDATION,3.50,Penggunaan kosmetik liquid base teratur.
+CUSHION,2.50,"Volume nettonya setengah dari foundation standar, lebih cepat habis."
+MICELLAR,2.75,Standardisasi volume pembersihan makeup harian.
+BB/CC/DD CREAM,3.50,Pola pemakaian mirip foundation cair harian.
+LOOSE POWDER,5.50,Sifat produk bubuk lebih efisien secara takaran per aplikasi.
+LIP TINT,2.50,Konsumsi produk bibir berbasis air/gel oleh konsumen muda.
+TONER & ESSENCE,3.25,Konsumsi rutin regimen skincare basic.
+LIP BALM,2.50,Frekuensi aplikasi tinggi karena faktor hidrasi konstan.
+FACE SERUM,2.25,"Kosmetik dengan konsentrasi tinggi, dosis tetes terbatas."
+SHAMPOO,1.75,Penggunaan personal care mandi standar rumah tangga.
+LIPSTICK,6.00,Rata-rata transfer rate produk stik padat ke bibir lebih tebal.
+EYEBROW,3.50,Dibatasi oleh intensitas rautan (jika pensil) atau mekanisme eret.
+PERFUME,4.25,Asumsi standar industri: 1 ml parfum berkisar antara 8-10 semprotan.
+BLUSH ON,13.00,Kategori decorative padat dengan pemakaian luas namun tipis.
+POMADE,3.50,Konsumsi harian produk penataan rambut pria.
+MASCARA,4.50,FDA: Batas aman produk mata cair maksimal 3-6 bulan karena bakteri.
+HAIR TONIC,2.25,Penggunaan pasca-keramas untuk perawatan rambut rontok.
+EYE LINER,4.50,FDA: Mengikuti standar pengawasan higienitas produk mata cair.
+LIP GLOSS,2.25,Tingkat re-apply sangat tinggi karena tekstur berminyak/lengket.
+REMOVER,2.25,Penggunaan terbatas hanya pada area makeup waterproof.
+BODY WASH,1.75,"Luas permukaan tubuh besar, siklus habis paling cepat di kamar mandi."
+CONDITIONER,2.50,Frekuensi pemakaian setengah dari frekuensi shampoo harian.
+FACE MASK,3.50,Kategori perawatan mingguan (Weekly treatment).
+EYE SHADOW,15.00,Variabilitas warna membuat satu warna jarang habis cepat.
+SETTING SPRAY,2.75,Penggunaan berbasis spray aerosol/mist halus.
+BODY GEL,1.25,"Gel menyerap cepat, kecenderungan konsumen memakai volume banyak."
+COMPACT POWDER,6.00,Pemakaian untuk setting harian tanpa intensitas covering tinggi.
+CONCEALER,7.00,Area aplikasi sangat kecil (bawah mata atau bekas jerawat).
+LIP SUNSCREEN,2.50,Digunakan berulang kali saat beraktivitas di luar ruangan.
+PRIMER,3.50,Diaplikasikan tipis sebelum foundation pada T-zone wajah.
+LIP MASK,5.00,Volume kecil dengan intensitas pakai berkala (malam hari).
+SPOT TREATMENT,5.50,"Bersifat fluktuatif, tergantung kondisi hormonal/kesehatan kulit."
+PACKAGE,2.50,Model PES: Paket dinilai dari item skincare harian utama (toner/serum).
+BODY BUTTER,2.50,Digunakan khusus area kulit sangat kering (siku/lutut).
+LIP SERUM,3.00,Volume mikro dengan botol aplikator tetes/roll kecil.
+HAIR POWDER,5.00,"Tekstur bubuk kering mikro, konsumsi per pakainya sangat sedikit."
+BODY LOTION,1.75,Logistik: Volume kemasan menengah dengan luas aplikasi besar.
+STYLING GEL,3.00,Volume pakai per aplikasi lebih banyak dibanding pomade minyak.
+EYE CREAM,4.50,Dosis aplikasi mikro (seukuran biji beras untuk kedua mata).
+TOOLS,9.00,Ditinjau dari standar higienitas aplikator (sponge/puff makeup).
+STYLING CREAM,3.50,Penggunaan mirip dengan gel rambut namun berbasis emulsi krim.
+HIGHLIGHTER,15.00,Diaplikasikan hanya pada tulang pipi dan hidung secara tipis.
+BODY OIL,2.50,Beberapa tetes minyak mampu mencakup area kulit yang luas.
+CONTOUR,13.00,Decorative padat/krim dengan area penggunaan terbatas.
+CREAMBATH,2.50,Takaran per pemakaian besar (20-30 gram) tapi frekuensi rendah.
+LIP LINER,7.00,"Konsumsi produk berbentuk pensil, habis karena rautan rutin."
+LIP SCRUB,5.00,Penggunaan terbatas untuk mencegah iritasi bibir.
+BODY SCRUB,2.50,Konsumsi massal per aplikasi (mengangkat sel kulit mati seluruh tubuh).
+HAIR SPRAY,6.50,Frekuensi pemakaian tidak konstan (bukan personal care harian dasar).
+STYLING LOTION,3.50,Diaplikasikan sebelum penggunaan hair dryer/catokan.
+BEARD SERUM,2.50,Area aplikasi terbatas pada area rahang dan dagu pria.
+MULTIPURPOSE,5.00,Penggunaan bervariasi tergantung kebutuhan darurat kulit iritasi.
+EYE SERUM,2.50,Dilengkapi aplikator roller besi yang melimitasi keluarnya cairan.
+BEARD OIL,3.50,Cukup 2-3 tetes per aplikasi untuk janggut pendek-menengah.
+HAIR OIL SERUM,3.00,"Mencegah rambut bercabang, pemakaian terfokus di ujung rambut."
+MASSAGE CREAM,7.00,Frekuensi sangat rendah meskipun volume sekali pakai cukup banyak.
+HAND WASH,1.00,Siklus habis paling cepat karena digunakan oleh seluruh anggota rumah.
+LEAVE IN TREATMENT,2.75,Melindungi kutikula rambut sepanjang hari secara konstan.
+HAIR SERUM,2.50,Konsumsi mirip dengan hair oil namun berbasis air/ringan.
+MUKENA,30.00,Siklus kerusakan material tekstil akibat pencucian berulang.
+ACCESSORIES,9.00,Faktor keausan fisik atau kehilangan produk ukuran kecil.
+SINGLE OIL,9.00,Penggunaan hitungan tetes tunggal (1 tetes ≈ 0.05 ml).
+BLEND OIL,7.50,Perilaku pakai mirip single oil namun frekuensi sering lebih tinggi.
+EXFOLIATING,4.50,Batasan klinis: Tidak boleh digunakan harian agar barrier kulit aman.
+PANTS,36.00,Faktor keausan kain fisik (wear and tear).
+BAGS,48.00,Bahan polimer/kanvas tahan lama dengan perawatan baik.
+MASSAGE OIL,6.00,"Daya sebar minyak tinggi, volume per aplikasi efisien."

@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paragon Empties Station Network & Monitoring</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/static/leaflet.min.css">
+
+<!-- Chart.js/Alpine/Leaflet/treemap di-host lokal (bukan CDN) -- versi CDN
+     sebelumnya 404 (Chart.js 4.4.4 sudah tidak ada di cdnjs, chartjs-chart-treemap
+     2.3.2 juga sudah ditarik dari jsdelivr) dan ada risiko diblokir firewall
+     korporat, jadi lebih aman disimpan di /static/. -->
+<script src="/static/chart.umd.min.js"></script>
+<script src="/static/chartjs-chart-treemap.min.js"></script>
+<script src="/static/leaflet.min.js"></script>
+<script defer src="/static/alpine.min.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['"Space Grotesk"', 'sans-serif'],
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'monospace'],
+        },
+        colors: {
+          navy: { 900:'#0B2038', 800:'#0F2D4A', 700:'#153c5e', 600:'#1c4d76' },
+          brand: { 700:'#24547E', 600:'#2E6DA4', 500:'#4A87BE', 300:'#9DC5E4', 100:'#E4EFF9' },
+          leaf: { 600:'#3F9C7B', 500:'#4CAE8B', 100:'#E3F4EC' },
+          amber: { 600:'#B9824B', 100:'#F7ECDE' },
+          rose: { 600:'#B6584F', 100:'#F7E7E5' },
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  body{ font-family:'Inter', system-ui, sans-serif; background:#F3F7FB; }
+  .font-display{ font-family:'Space Grotesk', sans-serif; }
+  .font-mono-num{ font-family:'IBM Plex Mono', monospace; }
+  .chart-box{ position:relative; height:280px; }
+  .chart-box.tall{ height:340px; }
+  .leaflet-container{ background:#EAF1F9; border-radius:14px; }
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background:#C7D6E5; border-radius:8px; }
+  [x-cloak]{ display:none !important; }
+</style>
+</head>
+<body class="text-slate-800">
+<div x-data="app()" x-init="init()" x-cloak class="flex min-h-screen">
+
+  <!-- ============================= SIDEBAR ============================= -->
+  <aside class="w-[300px] shrink-0 bg-gradient-to-b from-navy-900 to-navy-700 text-slate-200 flex flex-col">
+    <div class="px-6 pt-7 pb-5 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-leaf-500 flex items-center justify-center shadow-lg shrink-0">
+          <i class="fa-solid fa-recycle text-white text-lg"></i>
+        </div>
+        <div>
+          <div class="font-display font-semibold text-white text-[15px] leading-tight">Paragon Empties<br>Station Network</div>
+          <div class="text-[11px] text-slate-400 font-medium tracking-wide">& MONITORING</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="px-4 pt-5 flex flex-col gap-1.5">
+      <button @click="activeTab='monitoring'"
+        class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition"
+        :class="activeTab==='monitoring' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'">
+        <i class="fa-solid fa-chart-line w-4 text-center"></i> Monitoring
+      </button>
+      <button @click="activeTab='simulation'; loadSimulation()"
+        class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition"
+        :class="activeTab==='simulation' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'">
+        <i class="fa-solid fa-diagram-project w-4 text-center"></i> Simulation
+      </button>
+    </nav>
+
+    <!-- Tentang PES -->
+    <div class="px-5 pt-6 pb-4 mt-2">
+      <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-circle-info"></i> Tujuan & Latar Belakang
+      </div>
+      <div class="text-[12.5px] leading-relaxed text-slate-300 space-y-2.5">
+        <p>
+          <span class="text-leaf-500 font-semibold">Paragon Empties Station (PES)</span>
+          adalah jaringan <i>reverse vending machine</i> berbasis IoT yang menarik
+          kembali kemasan kosong skincare dari konsumen.
+        </p>
+        <p x-show="showMore" x-collapse>
+          <span class="text-brand-300 font-semibold">EPR (Extended Producer
+          Responsibility / Tanggung Jawab Produsen yang Diperluas)</span> adalah
+          kewajiban produsen untuk menarik &amp; mengelola kembali sampah dari
+          kemasan produknya sendiri setelah dikonsumsi — diatur lewat
+          <span class="text-brand-300 font-medium">Permen LHK No. 75/2019</span>,
+          dengan target wajib menarik kembali minimal
+          <span class="text-brand-300 font-medium">20% dari total berat kemasan
+          yang terjual</span>. Perusahaan yang tidak memenuhi target ini
+          terkena denda ("Denda EPR" di dashboard).
+        </p>
+        <p x-show="showMore" x-collapse>
+          PES adalah salah satu cara Paragon memenuhi kewajiban EPR tsb,
+          sekaligus menekan emisi dari jalur TPA &amp; pembakaran ilegal.
+          Trade-off utamanya: sedikit PES memicu denda EPR &amp; emisi baseline
+          tinggi, sementara PES berlebihan menaikkan emisi truk logistik balik
+          bertenaga solar.
+        </p>
+        <button @click="showMore = !showMore" class="text-brand-300 hover:text-brand-100 text-[11.5px] font-semibold inline-flex items-center gap-1">
+          <span x-text="showMore ? 'Tutup' : 'Baca selengkapnya'"></span>
+          <i class="fa-solid" :class="showMore ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-auto px-5 py-5 border-t border-white/10 text-[11px] text-slate-400 space-y-1.5">
+      <div class="flex items-center gap-2"><i class="fa-solid fa-earth-asia w-3.5"></i> Scope: B2B Jawa–Bali</div>
+      <div class="flex items-center gap-2"><i class="fa-regular fa-calendar w-3.5"></i> Jul 2025 – Jun 2026</div>
+      <div class="inline-flex items-center gap-1.5 mt-1.5 bg-white/10 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-leaf-500"></span>
+        <span x-text="'Data: ' + dataMode"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============================= MAIN ============================= -->
+  <main class="flex-1 px-8 py-7 max-w-[1400px]">
+
+    <!-- ======================= TAB 1: MONITORING ======================= -->
+    <div x-show="activeTab==='monitoring'">
+      <div class="mb-6">
+        <h1 class="font-display text-[22px] font-semibold text-navy-900">Monitoring Emisi Sampah Kemasan</h1>
+        <p class="text-[13px] text-slate-500 mt-0.5">Ringkasan deskriptif volume &amp; emisi sampah skincare pasca-konsumen, historis Jul 2025–Jun 2026.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-sm flex flex-wrap items-center gap-3">
+        <span class="text-[12px] font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-sliders"></i> Filter:</span>
+        <select x-model="filters.brand" @change="onFilterChange()" class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300">
+          <option value="">Semua Brand</option>
+          <template x-for="b in filterOptions.brands" :key="b"><option :value="b" x-text="b"></option></template>
+        </select>
+        <select x-model="filters.category" @change="onFilterChange()" class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300">
+          <option value="">Semua Category</option>
+          <template x-for="c in filterOptions.categories" :key="c"><option :value="c" x-text="c"></option></template>
+        </select>
+        <select x-model="filters.product_format" @change="onFilterChange()" class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300">
+          <option value="">Semua Format</option>
+          <template x-for="f in filterOptions.formats" :key="f"><option :value="f" x-text="f"></option></template>
+        </select>
+        <select x-model="filters.channel" @change="onFilterChange()" class="text-[13px] border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300">
+          <option value="">Semua Channel</option>
+          <template x-for="ch in filterOptions.channels" :key="ch"><option :value="ch" x-text="ch"></option></template>
+        </select>
+        <button @click="loadMonitoring()" :disabled="loading.monitoring"
+          class="text-[12.5px] font-semibold rounded-lg px-4 py-1.5 flex items-center gap-1.5 transition disabled:opacity-60 disabled:cursor-not-allowed"
+          :class="filterDirty ? 'bg-brand-600 text-white hover:bg-brand-700 animate-pulse' : 'bg-brand-100 text-brand-700 hover:bg-brand-300/40'">
+          <i class="fa-solid" :class="loading.monitoring ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+          <span x-text="loading.monitoring ? 'Menerapkan...' : 'Terapkan Filter'"></span>
+        </button>
+        <button @click="resetFilters()" class="text-[12px] text-slate-400 hover:text-rose-600 ml-1 flex items-center gap-1">
+          <i class="fa-solid fa-rotate-left"></i> Reset
+        </button>
+        <span class="text-[11.5px] text-slate-400 ml-auto flex items-center gap-1.5" x-show="!loading.monitoring && loadTimeMs.monitoring !== null">
+          <i class="fa-regular fa-clock"></i> Dimuat dalam <span x-text="fmtSeconds(loadTimeMs.monitoring)"></span>
+        </span>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11.5px] font-semibold text-slate-500">Total Volume Sampah di Pasar</span>
+            <div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-pump-soap"></i></div>
+          </div>
+          <div class="font-mono-num text-2xl font-semibold mt-2.5 text-navy-900" x-text="fmtNum(kpi.total_waste_volume_kg) + ' kg'"></div>
+          <div class="text-[11px] text-slate-400 mt-1" x-text="'Periode ' + (kpi.period || '—')"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11.5px] font-semibold text-slate-500">Total Emisi Baseline</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center"><i class="fa-solid fa-fire"></i></div>
+          </div>
+          <div class="font-mono-num text-2xl font-semibold mt-2.5 text-navy-900" x-text="fmtNum(kpi.total_baseline_emission_kg) + ' kg'"></div>
+          <div class="text-[11px] text-slate-400 mt-1" x-text="(kpi.total_baseline_emission_ton_co2e || 0) + ' ton CO2e'"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11.5px] font-semibold text-slate-500">Estimasi Capaian EPR</span>
+            <div class="w-8 h-8 rounded-lg bg-leaf-100 text-leaf-600 flex items-center justify-center"><i class="fa-solid fa-leaf"></i></div>
+          </div>
+          <div class="font-mono-num text-2xl font-semibold mt-2.5 text-navy-900" x-text="(kpi.epr_compliance_pct ?? 0) + '%'"></div>
+          <div class="text-[11px] mt-1" :class="(kpi.epr_compliance_pct||0) >= 100 ? 'text-leaf-600 font-semibold' : 'text-amber-600 font-semibold'"
+               x-text="(kpi.epr_compliance_pct||0) >= 100 ? 'Target 20% tercapai' : 'Belum capai target 20%'"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-[11.5px] font-semibold text-slate-500">Nilai Karbon Berjalan</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-coins"></i></div>
+          </div>
+          <div class="font-mono-num text-2xl font-semibold mt-2.5 text-navy-900" x-text="fmtRupiah(kpi.denda_karbon)"></div>
+          <div class="text-[11px] text-slate-400 mt-1">Shadow price @ Rp30rb/ton CO2e</div>
+        </div>
+      </div>
+
+      <!-- Charts row 1 -->
+      <div class="grid grid-cols-2 gap-5 mb-5">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="font-display font-semibold text-[14px] text-navy-900">Trendline Emisi Bulanan</div>
+          <div class="text-[11.5px] text-slate-500 mb-3">Jul 2025 – Jun 2026, ton CO2e</div>
+          <div class="chart-box tall relative">
+            <div x-show="loading.monitoring" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 rounded-xl">
+              <i class="fa-solid fa-spinner fa-spin text-brand-500 text-2xl"></i>
+            </div>
+            <canvas id="chartTrend"></canvas>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="font-display font-semibold text-[14px] text-navy-900">Distribusi Emisi per Wilayah</div>
+          <div class="text-[11.5px] text-slate-500 mb-3">Top kabupaten/kota customer, ton CO2e</div>
+          <div class="chart-box tall relative">
+            <div x-show="loading.monitoring" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 rounded-xl">
+              <i class="fa-solid fa-spinner fa-spin text-brand-500 text-2xl"></i>
+            </div>
+            <canvas id="chartRegion"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row 2 -->
+      <div class="grid grid-cols-2 gap-5">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="font-display font-semibold text-[14px] text-navy-900">Hirarki Produk (Treemap)</div>
+          <div class="text-[11.5px] text-slate-500 mb-3">Brand → Category → Format, ukuran = emisi (ton CO2e)</div>
+          <div class="chart-box tall relative">
+            <div x-show="loading.monitoring" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 rounded-xl">
+              <i class="fa-solid fa-spinner fa-spin text-brand-500 text-2xl"></i>
+            </div>
+            <canvas id="chartTreemap"></canvas>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="font-display font-semibold text-[14px] text-navy-900">Target EPR Wajib 20% vs Aktual</div>
+          <div class="text-[11.5px] text-slate-500 mb-3">Garis putus-putus = target wajib, kg limbah/bulan</div>
+          <div class="chart-box tall relative">
+            <div x-show="loading.monitoring" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-white/70 rounded-xl">
+              <i class="fa-solid fa-spinner fa-spin text-brand-500 text-2xl"></i>
+            </div>
+            <canvas id="chartEprTarget"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================= TAB 2: SIMULATION ======================= -->
+    <div x-show="activeTab==='simulation'">
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 class="font-display text-[22px] font-semibold text-navy-900">Simulasi Optimasi Jaringan PES</h1>
+          <p class="text-[13px] text-slate-500 mt-0.5">
+            Objective: minimasi total emisi karbon, dengan constraint keras
+            <span class="font-semibold text-brand-600">sampah tertarik ≥ 20% target EPR</span>.
+          </p>
+        </div>
+        <span class="text-[11.5px] text-slate-400 flex items-center gap-1.5 shrink-0 mt-1" x-show="!loading.simulation && loadTimeMs.simulation !== null">
+          <i class="fa-regular fa-clock"></i> Dimuat dalam <span x-text="fmtSeconds(loadTimeMs.simulation)"></span>
+        </span>
+      </div>
+
+      <div x-show="loading.simulation" x-cloak class="bg-white border border-slate-200 rounded-2xl p-10 mb-6 shadow-sm flex flex-col items-center justify-center gap-3 text-slate-500">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-brand-500"></i>
+        <span class="text-[13px] font-medium">Menghitung solver optimasi jaringan PES...</span>
+      </div>
+
+      <div x-show="!loading.simulation" x-cloak>
+
+      <!-- Headline banner: n stasiun aktif & % penurunan emisi -->
+      <div class="bg-gradient-to-r from-brand-700 to-leaf-600 rounded-2xl p-6 mb-6 shadow-md flex flex-wrap items-center justify-between gap-6 text-white">
+        <div class="flex items-center gap-6">
+          <div class="text-center">
+            <div class="font-mono-num text-6xl font-extrabold leading-none" x-text="scenario.optimal?.n_stations ?? '—'"></div>
+            <div class="text-[12px] font-bold uppercase tracking-wide opacity-90 mt-1.5">Stasiun PES Aktif</div>
+          </div>
+          <div class="w-px h-16 bg-white/30 hidden sm:block"></div>
+          <div class="max-w-xs">
+            <div class="text-[13px] font-medium opacity-95">Hasil solver optimasi Simulation — minimasi emisi dengan constraint sampah tertarik ≥ 20% target EPR.</div>
+            <div class="text-[12px] font-semibold mt-1.5 flex items-center gap-1.5" :class="scenario.epr_constraint_satisfied ? 'text-leaf-100' : 'text-amber-100'">
+              <i class="fa-solid" :class="scenario.epr_constraint_satisfied ? 'fa-circle-check' : 'fa-triangle-exclamation'"></i>
+              <span x-text="scenario.epr_constraint_satisfied ? 'Constraint EPR 20% terpenuhi' : 'Constraint EPR 20% belum terpenuhi oleh kandidat eligible'"></span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="text-center">
+            <div class="font-mono-num text-5xl font-extrabold leading-none" x-text="(scenario.emission_reduction_pct ?? 0) + '%'"></div>
+            <div class="text-[12px] font-bold uppercase tracking-wide opacity-90 mt-1.5">Penurunan Emisi</div>
+          </div>
+          <div class="text-center">
+            <div class="font-mono-num text-2xl font-bold leading-none" x-text="(scenario.optimal?.epr_compliance_pct ?? 0) + '%'"></div>
+            <div class="text-[11px] font-semibold uppercase tracking-wide opacity-90 mt-1.5">dari Target EPR 20%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario Comparison Side-by-Side -->
+      <div class="grid grid-cols-2 gap-5 mb-6">
+        <div class="bg-white border-2 border-rose-100 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div class="absolute top-0 right-0 text-[10px] font-bold text-rose-600 bg-rose-100 px-3 py-1 rounded-bl-xl">SKENARIO 1</div>
+          <div class="font-display font-semibold text-[15px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Baseline Waste Fate</div>
+          <div class="text-[11.5px] text-slate-500 mt-1 mb-4">Tanpa jaringan PES aktif</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-rose-50 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">TPA</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.baseline?.waste_fate_pct?.tpa ?? '—') + '%'"></div></div>
+            <div class="bg-rose-50 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Dibakar Ilegal</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.baseline?.waste_fate_pct?.burn ?? '—') + '%'"></div></div>
+            <div class="bg-rose-50 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Hanyut (as TPA)</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.baseline?.waste_fate_pct?.wild_as_tpa ?? '—') + '%'"></div></div>
+            <div class="bg-rose-50 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Via PES</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.baseline?.waste_fate_pct?.pes ?? 0) + '%'"></div></div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-[14px]">
+            <div class="flex justify-between"><span class="text-slate-500">Total Emisi</span><span class="font-mono-num font-bold text-base" x-text="(scenario.baseline?.total_emission_ton_co2e ?? '—') + ' ton CO2e'"></span></div>
+            <div class="flex justify-between"><span class="text-slate-500">EPR Compliance</span><span class="font-mono-num font-bold text-base text-rose-600" x-text="(scenario.baseline?.epr_compliance_pct ?? 0) + '%'"></span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Denda EPR/bulan</span><span class="font-mono-num font-bold text-base text-rose-600" x-text="fmtRupiah(scenario.baseline?.denda_epr_monthly)"></span></div>
+          </div>
+        </div>
+
+        <div class="bg-white border-2 border-leaf-100 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+          <div class="absolute top-0 right-0 text-[10px] font-bold text-leaf-600 bg-leaf-100 px-3 py-1 rounded-bl-xl">SKENARIO 2</div>
+          <div class="font-display font-semibold text-[15px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-circle-check text-leaf-600"></i> Jaringan PES Optimal</div>
+          <div class="text-[11.5px] text-slate-500 mt-1 mb-4">
+            <span x-text="scenario.optimal?.n_stations ?? '—'"></span> stasiun aktif — hasil solver Simulation
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-leaf-100/60 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">TPA</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.optimal?.waste_fate_pct?.tpa ?? '—') + '%'"></div></div>
+            <div class="bg-leaf-100/60 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Dibakar</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.optimal?.waste_fate_pct?.burn ?? '—') + '%'"></div></div>
+            <div class="bg-leaf-100/60 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Hanyut (as TPA)</div><div class="font-mono-num text-2xl font-bold text-navy-900" x-text="(scenario.optimal?.waste_fate_pct?.wild_as_tpa ?? '—') + '%'"></div></div>
+            <div class="bg-leaf-100/60 rounded-lg p-3.5"><div class="text-[13px] font-semibold text-slate-500 mb-1.5">Sukses via PES</div><div class="font-mono-num text-2xl font-bold text-leaf-600" x-text="(scenario.optimal?.waste_fate_pct?.pes ?? 0) + '%'"></div></div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-[14px]">
+            <div class="flex justify-between"><span class="text-slate-500">Total Emisi</span><span class="font-mono-num font-bold text-base" x-text="(scenario.optimal?.total_emission_ton_co2e ?? '—') + ' ton CO2e'"></span></div>
+            <div class="flex justify-between"><span class="text-slate-500">EPR Compliance</span><span class="font-mono-num font-bold text-base text-leaf-600" x-text="(scenario.optimal?.epr_compliance_pct ?? 0) + '%'"></span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Denda EPR/bulan</span><span class="font-mono-num font-bold text-base text-leaf-600" x-text="fmtRupiah(scenario.optimal?.denda_epr_monthly)"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map + Trade-off -->
+      <div class="grid grid-cols-3 gap-5">
+        <div class="col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div class="font-display font-semibold text-[14px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-map-location-dot text-brand-600"></i> Peta Jaringan PES Optimal — Pulau Jawa</div>
+          <div class="text-[11.5px] text-slate-500 mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full bg-brand-600"></span> PES terpilih</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-amber-600"></span> DC Pulau Jawa</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-4 h-0.5 bg-rose-600"></span> Rute reverse logistics</span>
+            <span class="inline-flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-full bg-brand-300/40 border border-brand-500"></span> Coverage radius PES</span>
+          </div>
+          <div id="networkMap" style="height:420px;" class="rounded-xl"></div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col gap-3.5">
+          <div class="font-display font-semibold text-[14px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-amber-600"></i> Financial & Emission Trade-off</div>
+
+          <div class="bg-leaf-100/60 rounded-xl p-3.5">
+            <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-leaf text-leaf-600"></i> Emisi Diselamatkan</div>
+            <div class="font-mono-num text-lg font-semibold text-leaf-600 mt-1" x-text="(tradeoff.emission_saved_ton_co2e ?? '—') + ' ton CO2e'"></div>
+          </div>
+          <div class="bg-brand-100 rounded-xl p-3.5">
+            <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-coins text-brand-600"></i> Nilai Kredit Karbon</div>
+            <div class="font-mono-num text-lg font-semibold text-brand-700 mt-1" x-text="fmtRupiah(tradeoff.carbon_credit_value_rp)"></div>
+          </div>
+          <div class="bg-leaf-100/60 rounded-xl p-3.5">
+            <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-leaf-600"></i> Denda EPR Terhindarkan</div>
+            <div class="font-mono-num text-lg font-semibold text-leaf-600 mt-1" x-text="fmtRupiah(tradeoff.epr_fine_avoided_rp)"></div>
+          </div>
+          <div class="bg-amber-100 rounded-xl p-3.5">
+            <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-truck text-amber-600"></i> Biaya Mesin PES/bulan</div>
+            <div class="font-mono-num text-lg font-semibold text-amber-600 mt-1" x-text="fmtRupiah(tradeoff.machine_cost_monthly_rp)"></div>
+          </div>
+          <div class="rounded-xl p-3.5 border-2" :class="(tradeoff.net_financial_benefit_rp||0) >= 0 ? 'border-leaf-500 bg-leaf-100/40' : 'border-rose-300 bg-rose-100/40'">
+            <div class="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-sack-dollar"></i> Net Financial Impact/bulan</div>
+            <div class="font-mono-num text-lg font-semibold mt-1" :class="(tradeoff.net_financial_benefit_rp||0) >= 0 ? 'text-leaf-600' : 'text-rose-600'" x-text="fmtRupiah(tradeoff.net_financial_benefit_rp)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grafik n Stasiun vs EPR Compliance & Penurunan Emisi -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm mt-5">
+        <div class="font-display font-semibold text-[14px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-chart-line text-brand-600"></i> Jumlah Stasiun PES vs EPR Compliance &amp; Penurunan Emisi</div>
+        <div class="text-[11.5px] text-slate-500 mb-3">Garis putus-putus merah = target wajib 20% EPR — lihat di titik n berapa compliance menyentuh garis ini</div>
+        <div class="chart-box tall"><canvas id="chartScaling"></canvas></div>
+      </div>
+
+      <!-- Tabel Kandidat Lokasi PES -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm mt-5">
+        <div class="font-display font-semibold text-[14px] text-navy-900 flex items-center gap-2"><i class="fa-solid fa-list-check text-brand-600"></i> Kandidat Lokasi PES</div>
+        <div class="text-[11.5px] text-slate-500 mb-2">Diurutkan berdasarkan prioritas skor optimasi · kecamatan = kecamatan dengan volume sampah tertinggi di kota tsb</div>
+        <div class="text-[11px] text-slate-500 mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-leaf-500"></span> Terpilih = dibangun PES</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Dekat DC (≤20km) = tidak perlu PES terpisah</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-slate-400"></span> Tercakup PES lain = coverage-nya sudah ditutupi kota tetangga</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-400"></span> Kandidat = eligible tapi belum terpilih (skor lebih rendah)</span>
+        </div>
+        <div class="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-slate-100">
+          <table class="w-full text-[13px]">
+            <thead class="bg-slate-50 sticky top-0 z-10">
+              <tr class="text-left text-slate-500 font-semibold">
+                <th class="px-3 py-2.5">#</th>
+                <th class="px-3 py-2.5">Kabupaten/Kota</th>
+                <th class="px-3 py-2.5">Kecamatan</th>
+                <th class="px-3 py-2.5">Lat, Long</th>
+                <th class="px-3 py-2.5 text-right">Volume (kg/bulan)</th>
+                <th class="px-3 py-2.5 text-right">Est. Emisi Terserap (ton CO2e/bulan)</th>
+                <th class="px-3 py-2.5">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in candidateTable" :key="row.rank + '-' + row.city">
+                <tr class="border-t border-slate-100" :class="row.selected ? 'bg-leaf-100/30' : ''">
+                  <td class="px-3 py-2 text-slate-400 font-mono-num" x-text="row.rank"></td>
+                  <td class="px-3 py-2 font-medium text-navy-900" x-text="row.city"></td>
+                  <td class="px-3 py-2 text-slate-600" x-text="row.district || '—'"></td>
+                  <td class="px-3 py-2 font-mono-num text-slate-500 text-[12px]" x-text="(row.lat ?? '—') + ', ' + (row.lon ?? '—')"></td>
+                  <td class="px-3 py-2 text-right font-mono-num" x-text="fmtNum(row.waste_kg_per_month)"></td>
+                  <td class="px-3 py-2 text-right font-mono-num font-semibold" x-text="fmtNum(row.estimated_emission_absorbed_ton_co2e_per_month)"></td>
+                  <td class="px-3 py-2">
+                    <span class="text-[10.5px] font-bold px-2 py-1 rounded-full" :class="statusClass(row.status)" x-text="statusLabel(row.status)"></span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// Registry Chart.js instance disimpan DI LUAR reactive state Alpine.
+// Kalau disimpan sebagai properti x-data, Alpine membungkusnya dalam Proxy
+// yang merusak identitas objek internal Chart.js (registry/WeakMap-nya),
+// menyebabkan chart.destroy() gagal bersih dan chart berikutnya gagal
+// render dengan error "Cannot read properties of undefined".
+const charts = {};
+
+function app(){
+  return {
+    activeTab: 'monitoring',
+    showMore: false,
+    dataMode: '—',
+    filters: { brand:'', category:'', product_format:'', channel:'' },
+    filterOptions: { brands:[], categories:[], formats:[], channels:[] },
+    filterDirty: false,
+    kpi: {},
+    scenario: {},
+    tradeoff: {},
+    candidateTable: [],
+    simulationLoaded: false,
+    loading: { monitoring: false, simulation: false },
+    loadTimeMs: { monitoring: null, simulation: null },
+
+    async init(){
+      try{
+        const health = await fetchJSON('/api/health');
+        this.dataMode = health.data_mode;
+      }catch(e){ this.dataMode = 'unknown'; }
+      try{
+        this.filterOptions = await fetchJSON('/api/filters');
+      }catch(e){ console.error(e); }
+      await this.loadMonitoring();
+    },
+
+    onFilterChange(){
+      this.filterDirty = true;
+    },
+
+    resetFilters(){
+      this.filters = { brand:'', category:'', product_format:'', channel:'' };
+      this.filterDirty = false;
+      this.loadMonitoring();
+    },
+
+    buildQuery(){
+      const p = new URLSearchParams();
+      Object.entries(this.filters).forEach(([k,v]) => { if(v) p.set(k, v); });
+      const s = p.toString();
+      return s ? ('?' + s) : '';
+    },
+
+    async loadMonitoring(){
+      const q = this.buildQuery();
+      const t0 = performance.now();
+      this.loading.monitoring = true;
+      this.filterDirty = false;
+      try{
+        this.kpi = await fetchJSON('/api/kpi' + q);
+        const [trend, region, treemap, eprTarget] = await Promise.all([
+          fetchJSON('/api/emission-trend' + q),
+          fetchJSON('/api/emission-by-region' + q),
+          fetchJSON('/api/emission-treemap' + q),
+          fetchJSON('/api/epr-target' + q),
+        ]);
+        renderTrendChart(charts, trend);
+        renderRegionChart(charts, region);
+        renderTreemapChart(charts, treemap);
+        renderEprTargetChart(charts, eprTarget);
+      }catch(e){ console.error(e); }
+      finally{
+        this.loading.monitoring = false;
+        this.loadTimeMs.monitoring = Math.round(performance.now() - t0);
+      }
+    },
+
+    async loadSimulation(){
+      const t0 = performance.now();
+      this.loading.simulation = true;
+      try{
+        const [scenario, tradeoff, mapData, candidateTable, scalingChart] = await Promise.all([
+          fetchJSON('/api/simulation/scenario-comparison'),
+          fetchJSON('/api/simulation/tradeoff'),
+          fetchJSON('/api/simulation/network-map'),
+          fetchJSON('/api/simulation/candidate-table'),
+          fetchJSON('/api/simulation/scaling-chart'),
+        ]);
+        this.scenario = scenario;
+        this.tradeoff = tradeoff;
+        this.candidateTable = candidateTable;
+        this.simulationLoaded = true;
+        renderScalingChart(charts, scalingChart.trajectory);
+        requestAnimationFrame(() => initOrUpdateMap(mapData));
+      }catch(e){ console.error(e); }
+      finally{
+        this.loading.simulation = false;
+        this.loadTimeMs.simulation = Math.round(performance.now() - t0);
+      }
+    },
+
+    fmtNum(v){
+      if(v === undefined || v === null || isNaN(v)) return '—';
+      return Number(v).toLocaleString('id-ID', {maximumFractionDigits:1});
+    },
+    fmtRupiah(v){
+      if(v === undefined || v === null || isNaN(v)) return '—';
+      const abs = Math.abs(v); const sign = v < 0 ? '-' : '';
+      if(abs >= 1e9) return sign + 'Rp' + (abs/1e9).toFixed(2) + 'M';
+      if(abs >= 1e6) return sign + 'Rp' + (abs/1e6).toFixed(1) + 'jt';
+      if(abs >= 1e3) return sign + 'Rp' + (abs/1e3).toFixed(0) + 'rb';
+      return sign + 'Rp' + abs.toFixed(0);
+    },
+    fmtSeconds(ms){
+      if(ms === null || ms === undefined) return '—';
+      return (ms/1000).toFixed(ms >= 1000 ? 1 : 2) + ' detik';
+    },
+    statusLabel(status){
+      return { selected:'TERPILIH', near_dc:'DEKAT DC', covered_by_other:'TERCAKUP PES LAIN', candidate:'KANDIDAT' }[status] || 'KANDIDAT';
+    },
+    statusClass(status){
+      return {
+        selected: 'bg-leaf-100 text-leaf-600',
+        near_dc: 'bg-amber-100 text-amber-600',
+        covered_by_other: 'bg-slate-100 text-slate-500',
+        candidate: 'bg-rose-100 text-rose-500',
+      }[status] || 'bg-slate-100 text-slate-500';
+    },
+  }
+}
+
+async function fetchJSON(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('Gagal fetch ' + url);
+  return await r.json();
+}
+
+const PALETTE = {
+  blue600:'#2E6DA4', blue500:'#4A87BE', blue300:'#9DC5E4', blue100:'#E4EFF9',
+  leaf:'#3F9C7B', amber:'#B9824B', rose:'#B6584F', gray:'#94A3B8'
+};
+const commonGrid = { color:'#EAF0F7' };
+const commonFont = { family:'Inter', size:11 };
+
+function destroyIfExists(charts, key){
+  if(charts[key]){ charts[key].destroy(); delete charts[key]; }
+}
+
+function renderTrendChart(charts, data){
+  destroyIfExists(charts, 'trend');
+  const ctx = document.getElementById('chartTrend');
+  if(!ctx) return;
+  charts.trend = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: data.map(d=>d.month),
+      datasets:[
+        { label:'Baseline (tanpa PES)', data:data.map(d=>d.baseline_ton_co2e),
+          borderColor: PALETTE.gray, backgroundColor:'transparent', borderDash:[5,4],
+          tension:.35, pointRadius:2, borderWidth:2 },
+        { label:'Skenario PES Penuh', data:data.map(d=>d.pes_scenario_ton_co2e),
+          borderColor: PALETTE.blue600, backgroundColor:'rgba(46,109,164,0.08)',
+          fill:true, tension:.35, pointRadius:2, borderWidth:2.5 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ position:'bottom', labels:{ font: commonFont, boxWidth:10, usePointStyle:true } },
+        tooltip:{ callbacks:{ label:(item)=> `${item.dataset.label}: ${item.formattedValue} ton CO2e` } }
+      },
+      scales:{
+        x:{ grid: commonGrid, ticks:{ font: commonFont } },
+        y:{ grid: commonGrid, ticks:{ font: commonFont }, title:{ display:true, text:'ton CO2e', font: commonFont } }
+      }
+    }
+  });
+}
+
+function renderRegionChart(charts, data){
+  destroyIfExists(charts, 'region');
+  const ctx = document.getElementById('chartRegion');
+  if(!ctx) return;
+  const top = data.slice(0,10);
+  charts.region = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: top.map(d=>d.city),
+      datasets:[
+        { label:'Baseline', data: top.map(d=>d.baseline_ton_co2e), backgroundColor: PALETTE.blue100, borderRadius:4 },
+        { label:'Skenario PES', data: top.map(d=>d.pes_scenario_ton_co2e), backgroundColor: PALETTE.blue600, borderRadius:4 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{
+        legend:{ position:'bottom', labels:{ font: commonFont, boxWidth:10, usePointStyle:true } },
+        tooltip:{ callbacks:{ label:(item)=> `${item.dataset.label}: ${item.formattedValue} ton CO2e` } }
+      },
+      scales:{ x:{ grid: commonGrid, ticks:{ font: commonFont } }, y:{ grid:{display:false}, ticks:{ font: commonFont } } }
+    }
+  });
+}
+
+function renderTreemapChart(charts, data){
+  destroyIfExists(charts, 'treemap');
+  const ctx = document.getElementById('chartTreemap');
+  if(!ctx || typeof Chart.registry.getController === 'undefined') {}
+  if(!ctx) return;
+  const palette = ['#2E6DA4','#4A87BE','#6FA0CC','#9DC5E4','#3F9C7B','#6BB89A','#B9824B','#C79E70'];
+  charts.treemap = new Chart(ctx, {
+    type:'treemap',
+    data:{
+      datasets:[{
+        tree: data,
+        key: 'emission_ton_co2e',
+        groups: ['brand','category','format'],
+        spacing: 1,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+        backgroundColor(ctx2){
+          if(ctx2.type !== 'data') return 'transparent';
+          return palette[ctx2.dataIndex % palette.length];
+        },
+        labels:{
+          display: true,
+          align: 'left', position:'top',
+          color:'#fff',
+          font: { size:10.5, family:'Inter', weight:'600' },
+          formatter(ctx2){
+            if(ctx2.type !== 'data') return '';
+            const g = ctx2.raw.g;
+            const v = ctx2.raw.v;
+            return g ? [g, (v||0).toFixed(1)+' t'] : '';
+          }
+        }
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:false },
+        tooltip:{
+          callbacks:{
+            title:(items)=> items[0]?.raw?.g || '',
+            label:(item)=> 'Emisi: ' + (item.raw.v||0).toFixed(2) + ' ton CO2e'
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderEprTargetChart(charts, data){
+  destroyIfExists(charts, 'eprTarget');
+  const ctx = document.getElementById('chartEprTarget');
+  if(!ctx) return;
+  charts.eprTarget = new Chart(ctx, {
+    data:{
+      labels: data.map(d=>d.month),
+      datasets:[
+        { type:'bar', label:'Aktual Tertarik', data:data.map(d=>d.actual_collected_kg),
+          backgroundColor: PALETTE.blue500, borderRadius:4 },
+        { type:'line', label:'Target EPR Wajib 20%', data:data.map(d=>d.target_epr_kg),
+          borderColor: PALETTE.rose, backgroundColor:'transparent', borderDash:[6,4],
+          tension:0, pointRadius:2, borderWidth:2 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ position:'bottom', labels:{ font: commonFont, boxWidth:10, usePointStyle:true } },
+        tooltip:{ callbacks:{ label:(item)=> `${item.dataset.label}: ${item.formattedValue} kg` } }
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{ font: commonFont } },
+        y:{ grid: commonGrid, ticks:{ font: commonFont }, title:{ display:true, text:'kg limbah', font: commonFont } }
+      }
+    }
+  });
+}
+
+function renderScalingChart(charts, trajectory){
+  destroyIfExists(charts, 'scaling');
+  const ctx = document.getElementById('chartScaling');
+  if(!ctx) return;
+  charts.scaling = new Chart(ctx, {
+    data:{
+      labels: trajectory.map(d=>d.n_stations),
+      datasets:[
+        { type:'line', label:'EPR Compliance (%)', data: trajectory.map(d=>d.epr_compliance_pct),
+          borderColor: PALETTE.blue600, backgroundColor:'rgba(46,109,164,0.08)', fill:true,
+          tension:.25, pointRadius:0, borderWidth:2.5, yAxisID:'y' },
+        { type:'line', label:'Penurunan Emisi (%)', data: trajectory.map(d=>d.emission_reduction_pct),
+          borderColor: PALETTE.leaf, backgroundColor:'transparent',
+          tension:.25, pointRadius:0, borderWidth:2.5, yAxisID:'y' },
+        { type:'line', label:'Target EPR Wajib 20%', data: trajectory.map(()=>20),
+          borderColor: PALETTE.rose, backgroundColor:'transparent', borderDash:[6,4],
+          tension:0, pointRadius:0, borderWidth:2, yAxisID:'y' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ position:'bottom', labels:{ font: commonFont, boxWidth:10, usePointStyle:true } },
+        tooltip:{ callbacks:{ label:(item)=> `${item.dataset.label}: ${item.formattedValue}%` } }
+      },
+      scales:{
+        x:{ grid:{display:false}, ticks:{ font: commonFont, maxTicksLimit:15 }, title:{ display:true, text:'Jumlah stasiun PES (n)', font: commonFont } },
+        y:{ grid: commonGrid, ticks:{ font: commonFont }, title:{ display:true, text:'%', font: commonFont } }
+      }
+    }
+  });
+}
+
+// ---- Leaflet map (Tab 2 Simulation) ----
+let leafletMap = null;
+let leafletLayerGroup = null;
+
+// Marker kotak untuk DC Facilities (L.circleMarker Leaflet selalu bulat,
+// jadi DC pakai divIcon HTML/CSS supaya bisa kotak).
+function squareIcon(color){
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px ${color};border-radius:3px;"></div>`,
+    iconSize: [14,14],
+    iconAnchor: [7,7],
+  });
+}
+
+function initOrUpdateMap(mapData){
+  const container = document.getElementById('networkMap');
+  if(!container) return;
+  if(!leafletMap){
+    leafletMap = L.map('networkMap', { scrollWheelZoom:false }).setView([-7.3, 110.8], 7);
+    // Basemap sederhana (CartoDB Positron) -- tanpa detail jalan/traffic
+    // seperti tile OSM standar, supaya titik PES/DC lebih mudah dibaca.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap contributors &copy; CARTO', maxZoom:16, subdomains:'abcd',
+    }).addTo(leafletMap);
+    leafletLayerGroup = L.layerGroup().addTo(leafletMap);
+  }
+  leafletLayerGroup.clearLayers();
+
+  // Rute reverse logistics digambar duluan (paling bawah) supaya titik PES/DC
+  // tetap kelihatan di atasnya.
+  (mapData.routes || []).forEach(r=>{
+    L.polyline([[r.from_lat, r.from_lon],[r.to_lat, r.to_lon]], {
+      color:'#DC2626', weight:3.5, opacity:0.8, dashArray:'6,5',
+    }).bindTooltip(`${r.from_city} → ${r.to_dc} (${r.distance_km} km)`).addTo(leafletLayerGroup);
+  });
+
+  // Coverage radius PES ("radar" biru transparan) -- 10km Jabodetabek / 20km
+  // di luar Jabodetabek, sesuai aturan modelling coverage antar-PES.
+  (mapData.nodes || []).forEach(n=>{
+    if(n.lat === null || n.lat === undefined) return;
+    L.circle([n.lat, n.lon], {
+      radius: (n.coverage_radius_km || 20) * 1000,
+      color:'#2E6DA4', weight:1, opacity:0.35,
+      fillColor:'#4A87BE', fillOpacity:0.10,
+    }).addTo(leafletLayerGroup);
+  });
+
+  (mapData.nodes || []).forEach(n=>{
+    if(n.lat === null || n.lat === undefined) return;
+    L.circleMarker([n.lat, n.lon], {
+      radius: 8,
+      color: '#1c4d76', fillColor: '#2E6DA4', fillOpacity: 0.9, weight: 2,
+    }).bindTooltip(
+      `<b>${n.city}</b><br>Status: PES Terpilih<br>`+
+      `Coverage radius: ${n.coverage_radius_km} km<br>`+
+      `Kepadatan usia produktif: ${Math.round(n.density_usia_produktif).toLocaleString('id-ID')}/km²<br>`+
+      `Volume sampah: ${n.waste_kg_per_month.toLocaleString('id-ID')} kg/bulan`
+    ).addTo(leafletLayerGroup);
+  });
+
+  (mapData.dc_facilities || []).forEach(dc=>{
+    L.marker([dc.lat, dc.lon], { icon: squareIcon('#B9824B') })
+      .bindTooltip(`<b>${dc.dc_name}</b><br>Distribution Center`)
+      .addTo(leafletLayerGroup);
+  });
+
+  setTimeout(()=> leafletMap.invalidateSize(), 150);
+}
+</script>
+</body>
+</html>

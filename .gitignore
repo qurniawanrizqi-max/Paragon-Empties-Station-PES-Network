@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments (venv lokal untuk dev, tidak perlu di-commit)
+venv/
+project_rizqi/
+.venv/
+
+# Secrets -- JANGAN pernah commit kredensial asli
+.env
+
+# Data mentah besar -- hanya dipakai proses build cache lokal sekali,
+# TIDAK dibutuhkan saat runtime (lihat cache/*.parquet). Sales CSV 3.8GB
+# jelas tidak muat di GitHub/Vercel; kepadatan CSV 7.2MB juga dibuang
+# supaya repo tetap ringan.
+data/data_sales_order_pes.csv
+data/data_kepadatan_penduduk.csv
+
+# Crosswalk cache regenerable, tidak dipakai saat serving (bukan bagian
+# dari waste_master_table.parquet)
+cache/location_crosswalk.csv
+
+# Vercel local project link
+.vercel
+
+# Claude Code local tooling config (personal, bukan bagian dari app)
+.claude/
+
+# Scratch/test files
+tmp_*.json

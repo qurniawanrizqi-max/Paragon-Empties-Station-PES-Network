@@ -1,0 +1,21 @@
+{
+  "builds": [
+    {
+      "src": "main.py",
+      "use": "@vercel/python",
+      "config": {
+        "includeFiles": [
+          "templates/**",
+          "static/**",
+          "cache/waste_master_table.parquet",
+          "cache/district_volume_table.parquet",
+          "cache/waste_reference_month.txt",
+          "data/dno_facilties.csv"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "main.py" }
+  ]
+}

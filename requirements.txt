@@ -1,0 +1,15 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+jinja2>=3.1
+python-dotenv>=1.0
+pandas>=2.2
+numpy>=1.26
+rapidfuzz>=3.9
+pyarrow>=17.0
+
+# snowflake-connector-python sengaja TIDAK dimasukkan di sini -- dependency-nya
+# berat (boto3, cryptography, dst) dan bikin ukuran build Vercel membengkak,
+# padahal deployment produksi pakai DATA_MODE=csv dengan cache Parquet yang
+# sudah dibundle (lihat cache/*.parquet), jadi kode koneksi Snowflake tidak
+# pernah dieksekusi. Kalau mau test DATA_MODE=snowflake secara lokal, install
+# manual: pip install snowflake-connector-python>=3.12
