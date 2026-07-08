@@ -325,11 +325,15 @@ def load_csv_facilities() -> pd.DataFrame:
     df = load_csv_table(s.csv_facilities_path, required_cols=["dc_code", "dc_name", "lat", "long"])
     # Banyak baris di file sumber pakai format desimal Indonesia (koma, mis.
     # "110,83" / "-3,63") bercampur dengan format titik pada kolom lat & long
-    # yang sama -- normalisasi keduanya jadi float, jika tidak _haversine_km()
-    # akan error "must be real number, not str".
+    # yang sama -- normalisasi keduanya jadi float TANPA SYARAT (bukan cuma
+    # kalau dtype terdeteksi object), karena parser CSV pandas bisa infer
+    # dtype kolom ini berbeda antar versi/lingkungan (pernah lolos jadi
+    # string di deployment meski aman di lokal, bikin _is_in_java()/
+    # _haversine_km() error "'<=' not supported between float and str").
     for col in ("lat", "long"):
-        if df[col].dtype == object:
-            df[col] = df[col].astype(str).str.replace(",", ".", regex=False).astype(float)
+        df[col] = pd.to_numeric(
+            df[col].astype(str).str.replace(",", ".", regex=False), errors="coerce"
+        )
     return df
 
 
@@ -1873,7 +1877,14 @@ _JAVA_LON_RANGE = (105.0, 114.6)
 
 
 def _is_in_java(lat, lon) -> bool:
-    if lat is None or lon is None or pd.isna(lat) or pd.isna(lon):
+    if lat is None or lon is None:
+        return False
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (TypeError, ValueError):
+        return False
+    if pd.isna(lat) or pd.isna(lon):
         return False
     return _JAVA_LAT_RANGE[0] <= lat <= _JAVA_LAT_RANGE[1] and _JAVA_LON_RANGE[0] <= lon <= _JAVA_LON_RANGE[1]
 
