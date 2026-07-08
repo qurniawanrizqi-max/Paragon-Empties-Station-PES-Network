@@ -886,8 +886,12 @@ def build_waste_master_table() -> pd.DataFrame:
     # bulan di master data, yang menggeser waste_month proyeksinya sampai
     # 3-4 tahun ke depan dan bikin angka "bulan berjalan" di KPI jadi 0
     # (kejatuhan di bulan yang nyaris tidak ada datanya).
+    # Cuma berlaku utk data csv/snowflake asli -- mock pakai placeholder
+    # "Skincare" generik (bukan taksonomi kategori asli), jadi filter ini
+    # akan membuang SEMUA baris mock kalau tetap diterapkan (bug yang
+    # baru ketemu: sales jadi kosong -> crosswalk kosong -> KeyError).
     SKINCARE_CATEGORIES = {"MAKE UP", "FACE CARE", "BODY CARE", "HAIR CARE"}
-    if "product_category_name" in sales.columns:
+    if s.data_mode != "mock" and "product_category_name" in sales.columns:
         sales = sales[sales["product_category_name"].isin(SKINCARE_CATEGORIES)].copy()
 
     masa = tbl["masa_habis_pakai"]
