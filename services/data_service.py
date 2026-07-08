@@ -498,8 +498,14 @@ def build_location_crosswalk(
             )
 
     crosswalk = pd.DataFrame(rows)
-    CROSSWALK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    crosswalk.to_csv(CROSSWALK_CACHE_PATH, index=False)
+    try:
+        CROSSWALK_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        crosswalk.to_csv(CROSSWALK_CACHE_PATH, index=False)
+    except OSError:
+        # Filesystem read-only (mis. Vercel serverless) -- caching cuma
+        # optimisasi best-effort, app tetap jalan tanpa cache ini (cuma
+        # dihitung ulang tiap proses baru alih-alih tersimpan permanen).
+        pass
     return crosswalk
 
 
@@ -752,8 +758,11 @@ def _csv_source_paths(s: Settings) -> list[Path]:
 
 
 def _save_reference_month(month_date_max) -> None:
-    REFERENCE_MONTH_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REFERENCE_MONTH_CACHE_PATH.write_text(pd.Timestamp(month_date_max).isoformat())
+    try:
+        REFERENCE_MONTH_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        REFERENCE_MONTH_CACHE_PATH.write_text(pd.Timestamp(month_date_max).isoformat())
+    except OSError:
+        pass  # filesystem read-only (mis. Vercel serverless) -- best-effort cache
 
 
 def _load_reference_month() -> Optional[pd.Timestamp]:
@@ -971,11 +980,14 @@ def build_waste_master_table() -> pd.DataFrame:
 
     if s.data_mode == "csv":
         _save_reference_month(sales["month_date"].max())
-        MASTER_TABLE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         district_volume = _compress_district_volume_for_cache(sales)
-        district_volume.to_parquet(DISTRICT_VOLUME_CACHE_PATH, index=False)
         compressed = _compress_master_table_for_cache(sales)
-        compressed.to_parquet(MASTER_TABLE_CACHE_PATH, index=False)
+        try:
+            MASTER_TABLE_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            district_volume.to_parquet(DISTRICT_VOLUME_CACHE_PATH, index=False)
+            compressed.to_parquet(MASTER_TABLE_CACHE_PATH, index=False)
+        except OSError:
+            pass  # filesystem read-only (mis. Vercel serverless) -- best-effort cache
         return compressed
 
     return sales
